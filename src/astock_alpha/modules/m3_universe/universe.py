@@ -1,3 +1,5 @@
+"""m3_universe — 点前股份池硬/软过滤。"""
+
 from __future__ import annotations
 
 from typing import Any
@@ -11,65 +13,62 @@ from astock_alpha.modules.m3_universe.snapshots import SnapshotProvider
 from astock_alpha.types import PipelineState
 
 
-# ── 环境适配过滤条件 ───────────────────────────────────────────
+# ── 环境适配过滤条件 ─────────────────────────────────────
 
 
 def _apply_environment_filter(
-    snaps: list[Any],
+    passed_symbols: list[str],
+    symbol_snaps: dict[str, Any],
     env_rating: str,
 ) -> list[str]:
     """根据大盘环境评级，对已通过硬过滤的股票做额外筛选。
 
-    无环境评级或未知评级：不过滤，全部保留。
+    只在 passed_symbols 中筛选，不会回灌被硬过滤剔除的股票。
+    无环境评级或未知评级：全部保留。
+    字段缺失（None）时：放行该条件（不因此剔除）。
     """
-    if not env_rating:
-        return [s.symbol for s in snaps]
+    if not env_rating or not passed_symbols:
+        return list(passed_symbols)
 
-    passed: list[str] = []
-    for snap in snaps:
-        symbol = snap.symbol
+    result: list[str] = []
+    for symbol in passed_symbols:
+        snap = symbol_snaps.get(symbol)
+        if snap is None:
+            result.append(symbol)
+            continue
+
+        ok = True
 
         if env_rating == "BULL_STRONG":
             # 动量 + 成长 + 活跃
-            ok = True
             if snap.momentum_20d is not None and snap.momentum_20d < 5.0:
-                ok = False  # 近20日涨幅<5% 剔除
+                ok = False
             elif snap.avg_turnover_20d is not None and snap.avg_turnover_20d < 3.0:
-                ok = False  # 近20日换手率<3% 剔除
-            if not ok:
-                continue
+                ok = False
 
         elif env_rating == "BULL_WEAK":
             # 估值合理 + ROE 质量
-            ok = True
             if snap.roe_ttm is not None and snap.roe_ttm < 10.0:
                 ok = False
-            if not ok:
-                continue
 
         elif env_rating == "BEAR_WEAK":
-            # 防御：低贝塔 + 低估值 + 稳定分红
-            ok = True
+            # 防御：低估值 + 稳定质量
             if snap.roe_ttm is not None and snap.roe_ttm < 5.0:
                 ok = False
-            if not ok:
-                continue
 
         elif env_rating == "BEAR_STRONG":
-            # 极防御：仅保留上证50/沪深300成分股（通过配置或大盘市值）
-            ok = True
+            # 极防御：仅保留大盘股
             if snap.total_market_cap is not None and snap.total_market_cap < 100e9:
                 ok = False  # <1000亿 剔除
-            if not ok:
-                continue
 
-        passed.append(symbol)
+        if ok:
+            result.append(symbol)
 
-    return passed
+    return result
 
 
 class UniverseModule(StrategyModule):
-    """Module 3: PIT hard/soft universe filters (design v1.0)."""
+    """Module 3: PIT hard/soft universe filters + 环境评级适配。"""
 
     name = "universe"
     module_id = "m3_universe"
@@ -102,8 +101,10 @@ class UniverseModule(StrategyModule):
         reject_counts: dict[str, int] = {}
         incomplete_set: set[str] = set()
         details: dict[str, Any] = {}
+        symbol_snaps: dict[str, Any] = {}
 
         for snap in snaps:
+            symbol_snaps[snap.symbol] = snap
             decision = evaluate_stock(snap, self.filter_cfg)
             incomplete_set.update(decision.incomplete_filters)
             if decision.passed:
@@ -125,11 +126,11 @@ class UniverseModule(StrategyModule):
                 f"{sorted(incomplete_set)}; degraded but not halted"
             )
 
-        # ── 环境适配过滤 ──
+        # ── 环境适配过滤（只对已通过硬过滤的股票操作）──
         env = (state.meta.get("m2_environment") or {})
         env_rating = env.get("rating", "")
         if env_rating:
-            env_filtered = _apply_environment_filter(snaps, env_rating)
+            env_filtered = _apply_environment_filter(passed, symbol_snaps, env_rating)
             if env_filtered:
                 rejected_env = set(passed) - set(env_filtered)
                 if rejected_env:
@@ -146,6 +147,7 @@ class UniverseModule(StrategyModule):
                     "falling back to unfiltered"
                 )
                 state.meta["env_filter_emptied"] = True
+
         state.meta["universe_input_size"] = len(snaps)
         state.meta["universe_size"] = len(passed)
         state.meta["universe_reject_counts"] = reject_counts

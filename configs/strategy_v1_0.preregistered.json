@@ -28,6 +28,7 @@
     "m0_governance": { "enabled": true, "impl": "builtin" },
     "m1_regime": { "enabled": true, "impl": "builtin" },
     "m2_sector": { "enabled": true, "impl": "stub" },
+    "m2_market_environment": { "enabled": true, "impl": "builtin" },
     "m3_universe": { "enabled": true, "impl": "builtin" },
     "m4_fundamentals": { "enabled": true, "impl": "stub" },
     "m5_technical": { "enabled": true, "impl": "stub" },
@@ -39,13 +40,13 @@
   },
   "data": {
     "provider": "a_share_5y",
-    "a_share_5y_root": "D:/下载文件夹/a_share_5y",
-    "benchmarks_root": "D:/下载文件夹/量化策略完整备份_20260717/data/benchmarks",
+    "a_share_5y_root": "/home/yuanzhinv45/Desktop/a_share_5y",
+    "benchmarks_root": "/home/yuanzhinv45/Desktop/benchmarks",
     "amount_window": 20,
     "max_symbols": null,
     "enrich_market_cap": true,
     "tushare_http_url": "http://8.136.22.187:8010/",
-    "tushare_token_path": "C:/Users/123/.tushare/token"
+    "tushare_token": "YOUR_TUSHARE_TOKEN_HERE"
   },
   "regime": {
     "ma_window": 60,

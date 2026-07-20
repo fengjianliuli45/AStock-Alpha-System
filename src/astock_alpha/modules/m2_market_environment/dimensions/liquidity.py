@@ -87,8 +87,8 @@ def score_liquidity(data: dict[str, Any]) -> tuple[float | None, dict[str, Any]]
         sub_scores["social_financing"] = None
         details["social_financing"] = {"value": None, "note": "missing"}
 
-    # 加权平均（子权重: M1 35%, M1M2 25%, DR007 25%, 社融 15%）
-    weights = {"m1_growth": 0.35, "m1_m2_spread": 0.25, "dr007": 0.25, "social_financing": 0.15}
+    # 加权平均（子权重: M1 30%, M1M2 25%, DR007 20%, 社融 25%） — 设计文档一致
+    weights = {"m1_growth": 0.30, "m1_m2_spread": 0.25, "dr007": 0.20, "social_financing": 0.25}
     total_w = 0.0
     weighted_sum = 0.0
     for k, w in weights.items():
