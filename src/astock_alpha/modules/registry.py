@@ -8,6 +8,9 @@ from astock_alpha.modules.m0_governance import GovernanceModule
 from astock_alpha.data.benchmarks import BenchmarkStore
 from astock_alpha.modules.m1_regime import RegimeModule
 from astock_alpha.modules.m3_universe import UniverseModule
+from astock_alpha.modules.m2_market_environment.environment import (
+    MarketEnvironmentModule,
+)
 from astock_alpha.modules.stubs import (
     EntryStub,
     ExitStub,
@@ -36,6 +39,8 @@ def build_default_modules(config: dict[str, Any]) -> dict[str, StrategyModule]:
         root = data.get("benchmarks_root")
         store = BenchmarkStore(root) if root else None
         modules["m1_regime"] = RegimeModule(config, store=store)
+    if enabled("m2_market_environment"):
+        modules["m2_market_environment"] = MarketEnvironmentModule(config)
     if enabled("m2_sector"):
         modules["m2_sector"] = SectorStub(config)
     if enabled("m3_universe"):
@@ -61,6 +66,7 @@ def build_default_modules(config: dict[str, Any]) -> dict[str, StrategyModule]:
 # Pipeline execution order (rebalance day morning → close → next open monitoring)
 PIPELINE_ORDER = [
     "m0_governance",
+    "m2_market_environment",  # 环境评级（五大维度），影响后续所有模块
     "m1_regime",
     "m2_sector",
     "m3_universe",

@@ -29,6 +29,12 @@ class StockSnapshot:
     has_fraud_or_violation_5y: bool | None = None
     non_standard_audit: bool | None = None
     analyst_coverage: int | None = None
+    # 环境适配过滤字段
+    momentum_20d: float | None = None  # 近20日涨幅%
+    avg_turnover_20d: float | None = None  # 近20日日均换手率%
+    roe_ttm: float | None = None  # ROE(TTM) %
+    industry: str | None = None
+    pe_ttm: float | None = None
 
 
 class SnapshotProvider(Protocol):
