@@ -17,7 +17,16 @@ import pandas as pd
 
 # ── 行业映射 ─────────────────────────────────────────────
 # 从 Tushare stock_basic 拉取，存为 CSV
-_DEFAULT_MAPPING_PATH = Path("/mnt/hgfs/host_downloads/a_share_5y/stock_industry_mapping.csv")
+# 优先使用 repo 内路径，fallback 到外部共享文件夹
+_REPO_MAPPING_PATH = Path(__file__).resolve().parent.parent.parent.parent / "data" / "stock_industry_mapping.csv"
+_FALLBACK_MAPPING_PATH = Path("/mnt/hgfs/host_downloads/a_share_5y/stock_industry_mapping.csv")
+_DEFAULT_MAPPING_PATH = _REPO_MAPPING_PATH if _REPO_MAPPING_PATH.exists() else _FALLBACK_MAPPING_PATH
+
+# ── 默认防御板块池（可被 select_sideways_sectors 的 defensive_pool 参数覆盖）
+DEFAULT_DEFENSIVE_POOL: list[str] = [
+    "银行", "电力", "水务", "供气供热", "公路", "铁路",
+    "机场", "港口", "保险", "黄金",
+]
 
 
 def load_industry_mapping(path: str | Path | None = None) -> dict[str, str]:
@@ -67,8 +76,8 @@ def compute_daily_industry_returns(
     panel["_sym"] = panel["code"].str.lower()
     # 也尝试构造 full symbol 格式
     panel["_full_sym"] = panel["code"].apply(
-        lambda c: f"SHSE.{c.split('.')[1]}" if c.startswith("sh") else (
-            f"SZSE.{c.split('.')[1]}" if c.startswith("sz") else c
+        lambda c: f"SHSE.{c.split('.')[1]}" if c.startswith("sh.") else (
+            f"SZSE.{c.split('.')[1]}" if c.startswith("sz.") else c
         )
     )
     # 先试 full sym，再试 raw sym
@@ -86,10 +95,16 @@ def compute_industry_momentum(
     industry_returns: pd.DataFrame,
     window: int = 20,
 ) -> pd.Series:
-    """计算每个行业过去 window 天的动量（累积涨跌幅）。"""
-    return (1 + industry_returns / 100).rolling(window).apply(
-        lambda x: x.prod() - 1, raw=True
-    ).iloc[-1] * 100  # 转为百分比
+    """计算每个行业过去 window 天的动量（累积涨跌幅）。
+
+    对 DataFrame 也可调用，返回最后一行（最近 window 天动量）。
+    对 Series 直接返回该 Series 的动量值。
+    """
+    cum = (1 + industry_returns / 100)
+    rolled = cum.rolling(window).apply(lambda x: x.prod() - 1, raw=True)
+    if isinstance(industry_returns, pd.DataFrame):
+        return rolled.iloc[-1] * 100
+    return rolled.iloc[-1] * 100
 
 
 def compute_industry_volume_growth(
@@ -103,13 +118,7 @@ def compute_industry_volume_growth(
     panel["industry"] = panel["code"].map(industry_mapping)
     panel = panel[panel["industry"].notna()]
 
-    daily_vol = panel.groupby(["date", "industry"])[amount_col].sum().reset_index()
-    recent = daily_vol.groupby("industry")[amount_col].apply(
-        lambda x: x.tail(min(len(x), 5)).mean()
-    )
-    # 需要一个 stable 聚合
-    industry_vol = panel.groupby("date")[amount_col].sum()
-    # 简单方案：用每只股票amount求和，按industry groupby
+    # 用每只股票amount求和，按industry groupby
     daily_vol_pivot = panel.groupby(["date", "industry"])[amount_col].sum().unstack()
     if daily_vol_pivot.empty:
         return pd.Series(dtype=float)
@@ -166,6 +175,7 @@ def select_bull_sectors(
     industry_returns: pd.DataFrame,
     momentum: pd.Series,
     volume_growth: pd.Series | None = None,
+    hs300_momentum: float = 0.0,
     top_n: int = 3,
     verbose: bool = False,
 ) -> SectorAllocation:
@@ -174,7 +184,7 @@ def select_bull_sectors(
     综合评分：
     - 动量强度（近 20 日涨跌幅，权重 60%）
     - 成交额增速（权重 20%）
-    - 相对沪深300 超额（使用动量作为 proxy，权重 20%）
+    - 相对沪深300 超额（权重 20%）
     """
     candidates: list[tuple[str, float]] = []
 
@@ -187,8 +197,9 @@ def select_bull_sectors(
         # 成交额增速 20%
         if volume_growth is not None and ind in volume_growth.index:
             score += volume_growth[ind] * 0.2
-        # 动量相对分数作为超额 proxy 20%
-        score += momentum[ind] * 0.2  # 简化为自身动量
+        # 相对沪深300 超额 20%
+        excess = momentum[ind] - hs300_momentum
+        score += excess * 0.2
         candidates.append((ind, score))
 
     candidates.sort(key=lambda x: x[1], reverse=True)
@@ -222,17 +233,15 @@ def select_sideways_sectors(
     industry_returns: pd.DataFrame,
     momentum: pd.Series,
     mode: str = "defensive",
+    defensive_pool: list[str] | None = None,
     verbose: bool = False,
 ) -> SectorAllocation:
     """SIDEWAYS 区：双轨制。
 
     mode='oversold': 超跌反弹 — 近20日跌幅前5 + RSI ≤ 30
-    mode='defensive': 防御持有 — 固定防御池
+    mode='defensive': 防御持有 — 固定防御池（可通过 defensive_pool 参数覆盖）
     """
-    DEFENSIVE_POOL = [
-        "银行", "电力", "水务", "供气供热", "公路", "铁路",
-        "机场", "港口", "保险", "黄金"
-    ]
+    pool = defensive_pool if defensive_pool is not None else DEFAULT_DEFENSIVE_POOL
 
     if mode == "oversold":
         # 找超跌行业
@@ -246,7 +255,7 @@ def select_sideways_sectors(
         weights = [0.5, 0.5]
     else:
         # 防御持有：从防御池里找当天有数据的
-        available = [ind for ind in DEFENSIVE_POOL if ind in momentum.index]
+        available = [ind for ind in pool if ind in momentum.index]
         selected = available[:3]
         weights = [1.0 / len(selected)] * len(selected) if selected else []
 
@@ -268,6 +277,7 @@ def compute_sector_allocation(
     m1_position_multiplier: float,
     panel: pd.DataFrame,
     industry_mapping: dict[str, str] | None = None,
+    index_returns: pd.DataFrame | None = None,
     verbose: bool = False,
 ) -> dict[str, Any]:
     """根据 m1 区制和当日面板数据，输出行业配置。
@@ -304,9 +314,15 @@ def compute_sector_allocation(
     # 成交额增速
     vol_growth = compute_industry_volume_growth(panel, industry_mapping)
 
+    # 沪深300 动量（用于超额收益评分）
+    hs300_momentum = 0.0
+    if index_returns is not None:
+        hs300_momentum = compute_industry_momentum(index_returns.to_frame("hs300"), window=20).iloc[0]
+
     if m1_regime == "bull":
         result = select_bull_sectors(
             ind_rets, momentum, vol_growth,
+            hs300_momentum=hs300_momentum,
             verbose=verbose
         )
         pos = m1_position_multiplier
