@@ -1,7 +1,7 @@
 # 掘金宿主回测接入设计
 
 > 日期：2026-08-05  
-> 状态：待用户审阅  
+> 状态：已批准；实现计划见 `docs/superpowers/plans/2026-08-05-gm-host-backtest-plan.md`  
 > 范围：方案 1 — 掘金宿主 + 本库 StrategyPipeline + 信号级薄适配；仅回测  
 > 关联：桌面《量化策略完整模块设计_v1.0》；现有 `SnapshotProvider` / m0–m3  
 > 借鉴边界：符号与生命周期对齐掘金 gm SDK；决策逻辑不迁出本库；不做完整 m6–m8
