@@ -1,0 +1,120 @@
+{
+  "strategy_name": "astock_alpha_modular",
+  "version": "v1.0",
+  "status": "preregistered",
+  "trading_enabled": false,
+  "design_doc": "量化策略完整模块设计_v1.0.md",
+  "lessons_log": "量化策略_教训与犯错日志.md",
+  "created_at": "2026-07-18",
+  "note": "掘金宿主回测示例：信号级等权 Top-N，不可当作晋级门可迁移结果（L-006/L-007）",
+  "governance": {
+    "param_freeze": true,
+    "forbid_post_hoc_tuning": true,
+    "death_line": {
+      "consecutive_oos_windows_ir_below": -0.5,
+      "strike_count_to_freeze": 3
+    },
+    "promotion_gate": {
+      "min_oos_rebalance_periods": 24,
+      "require_normal_cost_return_gt_0": true,
+      "require_double_cost_return_ge_0": true,
+      "max_drawdown": 0.20,
+      "min_information_ratio": 0.5,
+      "min_positive_excess_month_ratio": 0.55,
+      "min_rolling_12m_ir": 0.3,
+      "max_single_factor_alpha_share": 0.50
+    }
+  },
+  "modules": {
+    "m0_governance": { "enabled": true, "impl": "builtin" },
+    "m1_regime": { "enabled": true, "impl": "builtin" },
+    "m2_sector": { "enabled": true, "impl": "stub" },
+    "m3_universe": { "enabled": true, "impl": "builtin" },
+    "m4_fundamentals": { "enabled": true, "impl": "stub" },
+    "m5_technical": { "enabled": true, "impl": "stub" },
+    "m6_entry": { "enabled": true, "impl": "stub" },
+    "m7_sizing": { "enabled": true, "impl": "stub" },
+    "m8_exit": { "enabled": true, "impl": "stub" },
+    "m9_portfolio_risk": { "enabled": true, "impl": "stub" },
+    "m10_monitor": { "enabled": true, "impl": "stub" }
+  },
+  "data": {
+    "provider": "gm",
+    "gm_token_path": null,
+    "gm_adjust": "prev",
+    "a_share_5y_root": "D:/下载文件夹/a_share_5y",
+    "benchmarks_root": "D:/下载文件夹/量化策略完整备份_20260717/data/benchmarks",
+    "amount_window": 20,
+    "max_symbols": null,
+    "enrich_market_cap": true,
+    "tushare_http_url": "http://8.136.22.187:8010/",
+    "tushare_token_path": "C:/Users/123/.tushare/token"
+  },
+  "gm_host": {
+    "frequency": "1d",
+    "rebalance": "daily",
+    "clock_symbol": "SHSE.000300",
+    "backtest_start": "2021-01-01",
+    "backtest_end": "2025-12-31",
+    "initial_cash": 1000000,
+    "strategy_id": "astock_alpha_gm"
+  },
+  "regime": {
+    "ma_window": 60,
+    "sideways_band": 0.03,
+    "slope_lookback": 5,
+    "confirm_days": 2,
+    "panic_day_drop": 0.05,
+    "panic_5d_drop": 0.10,
+    "panic_recover_days": 3,
+    "enable_breadth": false
+  },
+  "universe": {
+    "min_listed_trading_days": 120,
+    "min_avg_amount_20d": 100000000,
+    "min_total_market_cap": 5000000000,
+    "max_unlock_pct_next_30d": 0.05,
+    "max_goodwill_to_equity": 0.30,
+    "max_quarter_ni_yoy_drop": -0.50,
+    "max_pledge_ratio": 0.50,
+    "min_analyst_coverage": 3,
+    "apply_soft_filters": true,
+    "enforce_suspension": true,
+    "limit_up_in_universe": false
+  },
+  "portfolio": {
+    "max_holdings": 3,
+    "single_name_max_weight": 0.50,
+    "single_name_min_weight": 0.10,
+    "max_per_industry": 1,
+    "cash_floor": 0.05
+  },
+  "regime_multiplier": {
+    "bull": 1.0,
+    "sideways": 0.5,
+    "bear": 0.2,
+    "panic": 0.0
+  },
+  "exit": {
+    "hard_stop_pct": 0.08,
+    "time_stop_days": 30,
+    "time_stop_min_return": 0.02,
+    "scale_out": [0.10, 0.20, 0.30],
+    "trailing": {
+      "activate_at": 0.10,
+      "pct_at_10": 0.06,
+      "pct_at_20": 0.04,
+      "pct_at_30": 0.03
+    }
+  },
+  "costs": {
+    "base_slippage": 0.002,
+    "commission_rate": 0.0003,
+    "stamp_tax_sell": 0.0005
+  },
+  "data_split": {
+    "train": 0.60,
+    "valid": 0.20,
+    "test": 0.20
+  }
+}

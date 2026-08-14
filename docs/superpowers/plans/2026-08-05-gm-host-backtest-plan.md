@@ -1,6 +1,7 @@
 # 实现计划：掘金宿主回测接入
 
-依据：`docs/superpowers/specs/2026-08-05-gm-host-backtest-design.md`
+依据：`docs/superpowers/specs/2026-08-05-gm-host-backtest-design.md`  
+状态：本库任务 1–4 已落地；任务 5 终端手工回测待你在掘金侧验收
 
 教训约束（动手前已扫）：L-001 不拧参复活；L-005 Regime 缩放必须生效；L-006/L-007 信号等权+乐观成本仅作链路验证，文档标明不可当可晋升结果；本轮不做完整出场（知悉 L-003 缺口，属设计非目标）。
 
